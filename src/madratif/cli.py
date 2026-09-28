@@ -19,6 +19,22 @@ Perintah controller (ketik ini di HP / Termux atau terminal pengontrol):
   madratif ping <client>              cek koneksi ke client
   madratif update <client>            paksa client tarik versi terbaru & restart
 
+Prank (jalan di PC target; pakai 'all' untuk semua PC):
+  madratif say <teks...> <client>     PC ngomong (text-to-speech)
+  madratif notify <pesan...> <client> munculin pop-up teks
+  madratif rickroll <client>          buka Rick Astley fullscreen
+  madratif beep <client>              mainin bunyi
+  madratif wallpaper <url|reset> <client>   ganti wallpaper (reset = balik)
+  madratif matrix <client>            layar hujan kode hijau
+  madratif fakeupdate <client>        layar "Windows Update" palsu
+  madratif minimize <client>          minimize semua jendela
+  madratif volume <0-100|max> <client>      atur volume
+  madratif spin <client>              putar layar 180 (unspin = balik)
+  madratif unspin <client>            balikin layar normal
+  madratif bsod <client>              blue screen palsu
+  madratif disco <client>             layar kedip warna-warni
+  madratif countdown <detik> <client> hitung mundur "self-destruct"
+
 Perintah client (di PC yang mau dikontrol):
   madratif client start [--id NAMA]   jalankan agent (menunggu perintah)
   madratif client id                  tampilkan client id mesin ini
@@ -139,6 +155,18 @@ def main(argv=None) -> int:
         from . import statuspanel
 
         return statuspanel.run()
+    if cmd in ("_matrix", "_fakeupdate", "_bsod", "_disco", "_countdown"):
+        from . import pranks_ui
+
+        if cmd == "_matrix":
+            return pranks_ui.matrix()
+        if cmd == "_fakeupdate":
+            return pranks_ui.fakeupdate()
+        if cmd == "_bsod":
+            return pranks_ui.bsod()
+        if cmd == "_disco":
+            return pranks_ui.disco()
+        return pranks_ui.countdown(int(rest[0]) if rest else 10)
 
     # Client agent.
     if cmd == "client":
@@ -188,6 +216,33 @@ def main(argv=None) -> int:
     if cmd == "update":
         target = rest[0] if rest else "all"
         return controller.send_command(target, "update", wait=30.0)
+
+    # --- prank commands ---
+    if cmd in ("say", "notify"):
+        if len(rest) < 2:
+            print(f"Pakai: madratif {cmd} <teks...> <client>")
+            return 2
+        return controller.send_command(rest[-1], cmd, {"text": " ".join(rest[:-1])})
+    if cmd == "wallpaper":
+        if len(rest) < 2:
+            print("Pakai: madratif wallpaper <url|reset> <client>")
+            return 2
+        return controller.send_command(rest[-1], "wallpaper", {"url": rest[0]})
+    if cmd == "volume":
+        if len(rest) < 2:
+            print("Pakai: madratif volume <0-100|max> <client>")
+            return 2
+        return controller.send_command(rest[-1], "volume", {"level": rest[0]})
+    if cmd == "countdown":
+        if len(rest) < 2:
+            print("Pakai: madratif countdown <detik> <client>")
+            return 2
+        return controller.send_command(rest[-1], "countdown", {"seconds": rest[0]})
+    if cmd in ("rickroll", "beep", "matrix", "fakeupdate", "minimize", "spin", "unspin", "bsod", "disco"):
+        if len(rest) < 1:
+            print(f"Pakai: madratif {cmd} <client>")
+            return 2
+        return controller.send_command(rest[0], cmd)
 
     print(f"Perintah tidak dikenal: {cmd}\n")
     print(USAGE)

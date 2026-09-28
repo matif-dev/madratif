@@ -86,6 +86,29 @@ madratif ping client-1
 madratif screensaver all
 ```
 
+### Prank (buat PC sendiri / teman yang izin)
+
+```bash
+madratif say halo aku mengawasimu client-1   # PC ngomong (TTS)
+madratif notify ada hantu di belakangmu client-1
+madratif rickroll client-1                   # Rick Astley fullscreen
+madratif beep client-1
+madratif wallpaper https://.../lucu.jpg client-1
+madratif wallpaper reset client-1            # balikin wallpaper
+madratif matrix client-1                     # hujan kode hijau
+madratif fakeupdate client-1                 # "Windows Update" palsu
+madratif minimize client-1                   # minimize semua jendela
+madratif volume max client-1                 # atau: volume 30
+madratif spin client-1                       # putar layar 180
+madratif unspin client-1                     # balikin normal
+madratif bsod client-1                       # blue screen palsu
+madratif disco client-1                      # layar kedip warna
+madratif countdown 10 client-1               # hitung mundur "self-destruct"
+```
+
+Semua reversible: layar prank ditutup dengan menekan tombol apa saja,
+`unspin` membalik layar, `wallpaper reset` mengembalikan wallpaper.
+
 ## Update otomatis
 
 Setiap client **mengecek repo GitHub secara berkala** (default tiap ~10 menit).
