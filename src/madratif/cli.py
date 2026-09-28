@@ -23,7 +23,8 @@ Perintah client (di PC yang mau dikontrol):
   madratif client id                  tampilkan client id mesin ini
 
 Konfigurasi:
-  madratif setup                      buat / ubah konfigurasi
+  madratif connect <kode>             sambungkan device ini pakai kode rahasia
+  madratif setup                      buat / ubah konfigurasi (lanjutan)
   madratif config                     tampilkan konfigurasi saat ini
   madratif version
 
@@ -76,6 +77,28 @@ def cmd_setup() -> int:
     return 0
 
 
+def cmd_connect(args) -> int:
+    if not args:
+        print("Pakai: madratif connect <kode>")
+        return 2
+    code = args[0]
+    cfg = cfgmod.load()
+    cfg["network_key"] = code
+    if len(args) > 1:
+        cfg["broker"] = args[1]
+    if len(args) > 2:
+        try:
+            cfg["port"] = int(args[2])
+        except ValueError:
+            pass
+    if not cfg.get("client_id"):
+        cfg["client_id"] = cfgmod.default_client_id()
+    cfgmod.save(cfg)
+    print(f"Tersambung ke jaringan '{code}' (broker {cfg['broker']}:{cfg['port']}).")
+    print("Coba sekarang:  madratif clients")
+    return 0
+
+
 def cmd_config() -> int:
     cfg = cfgmod.load()
     safe = dict(cfg)
@@ -99,6 +122,8 @@ def main(argv=None) -> int:
     if cmd in ("version", "-v", "--version"):
         print("madratif", __version__)
         return 0
+    if cmd == "connect":
+        return cmd_connect(rest)
     if cmd == "setup":
         return cmd_setup()
     if cmd == "config":

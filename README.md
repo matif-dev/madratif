@@ -34,46 +34,43 @@ Pakai `all` sebagai `<client>` untuk mengirim ke semua PC sekaligus.
 - **Network key** adalah kata sandi acak yang mengisolasi device kamu di broker.
   Semua device kamu harus memakai network key yang **sama**.
 
+## Satu KODE untuk semuanya
+
+Tentukan **satu kode rahasia** milikmu (bebas, mis. `naga-merah-77`). Kode itu:
+- menghubungkan semua device kamu, dan
+- jadi kunci akses - hanya yang tahu kodenya yang bisa menyambung.
+
+Pakai kode yang **sama** di PC dan di HP. Karena kamu yang menentukan, tidak ada
+yang perlu dicatat dari layar.
+
 ## Install di PC (Windows) - sisi client (ALL-IN-ONE)
 
-Buka **PowerShell**, jalankan **satu baris** ini. Tidak perlu install Python
-atau apa pun dulu - Windows yang baru pun langsung bisa:
+Buka **PowerShell**, tempel **satu baris** ini (ganti `KODE` dengan kodemu).
+Windows baru pun langsung bisa - tidak perlu install Python/pip dulu:
 
 ```powershell
-irm https://raw.githubusercontent.com/matif-dev/madratif/main/install.ps1 | iex
+$env:MADRATIF_KEY="KODE"; irm https://raw.githubusercontent.com/matif-dev/madratif/main/install.ps1 | iex
 ```
 
-Yang terjadi otomatis:
-- Kalau Python belum ada -> diunduh versi **portable** (tanpa admin, tanpa pip).
-- Kode MADRATIF diunduh (murni standard library, **tanpa dependency**).
-- Kamu ditanya **network key** (Enter = dibuat otomatis) dan nama client.
-- Dipasang **autostart** (jalan sendiri & tersembunyi saat login) lalu langsung
-  dijalankan.
+Selesai. Otomatis: unduh Python portable kalau belum ada, pasang aplikasi,
+konfigurasi, **autostart**, lalu jalankan agent **di background**. Tidak ada
+pertanyaan, tidak ada yang perlu dicatat - **terminal boleh langsung ditutup**.
 
-Catat **network key** yang muncul - itu yang dipakai di HP.
+Punya beberapa PC? Tempel baris yang sama (kode sama) di tiap PC. Nama client
+otomatis dari nama komputer, jadi tiap PC beda sendiri.
 
-Punya beberapa PC? Jalankan baris yang sama di tiap PC, isi **network key yang
-sama**, beri nama client berbeda (`client-1`, `client-2`, ...). Mau tanpa
-tanya-jawab? Set dulu:
+## Install di HP (Termux) - sisi master
 
-```powershell
-$env:MADRATIF_KEY="kunci-sama"; $env:MADRATIF_CLIENT_ID="client-2"; irm https://raw.githubusercontent.com/matif-dev/madratif/main/install.ps1 | iex
-```
-
-## Install di HP (Termux) - sisi controller
-
-Di Termux:
+Tempel **satu baris** ini di Termux (ganti `KODE` dengan kode yang sama):
 
 ```bash
-pkg install -y python git
-pip install "git+https://github.com/matif-dev/madratif"
-madratif setup     # isi network key yang SAMA dengan PC
+curl -s https://raw.githubusercontent.com/matif-dev/madratif/main/install-termux.sh | bash -s -- KODE
 ```
 
-atau pakai skrip:
+Selesai - langsung tersambung, tanpa isi-isi lagi. Habis itu tinggal perintah:
 
 ```bash
-bash install-termux.sh https://github.com/matif-dev/madratif
+madratif clients
 ```
 
 ## Pakai

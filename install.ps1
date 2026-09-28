@@ -89,12 +89,9 @@ if (-not $key) {
     Write-Host "Network key baru dibuat otomatis." -ForegroundColor Yellow
 }
 
+# Nama client otomatis dari nama komputer (tidak perlu diisi / dicatat).
 $cid = $env:MADRATIF_CLIENT_ID
-$cidDefault = $env:COMPUTERNAME.ToLower()
-if (-not $cid -and [Environment]::UserInteractive) {
-    $cid = Read-Host "Nama client (Enter = $cidDefault)"
-}
-if (-not $cid) { $cid = $cidDefault }
+if (-not $cid) { $cid = $env:COMPUTERNAME.ToLower() }
 
 $cfgDir = Join-Path $env:USERPROFILE '.madratif'
 New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
@@ -146,14 +143,13 @@ Write-Host "  Network key : $key" -ForegroundColor Yellow
 Write-Host "  Client ID   : $cid"
 Write-Host "  Broker      : broker.emqx.io:1883"
 Write-Host ""
-Write-Host "SIMPAN network key di atas - pakai yang SAMA di HP (Termux)." -ForegroundColor Yellow
+Write-Host "Pakai KODE ini juga di HP (Termux). Tidak perlu dicatat kalau kamu yang menentukannya." -ForegroundColor Yellow
 Write-Host ""
 
 if ($env:MADRATIF_NOSTART) {
     Write-Host "Jalankan client kapan saja lewat:  $agentCmd"
 } else {
-    Write-Host "Menjalankan client sekarang..." -ForegroundColor Cyan
     $env:PYTHONPATH = $pyPathForRun
-    Start-Process -FilePath $pyExe -ArgumentList @('-m', 'madratif', 'client', 'start')
-    Write-Host "Client jalan di jendela baru. Boleh ditutup - nanti otomatis jalan lagi saat login."
+    Start-Process -FilePath $pythonw -ArgumentList @('-m', 'madratif', 'client', 'start') -WindowStyle Hidden
+    Write-Host "Client sudah jalan DI BACKGROUND. Terminal ini boleh langsung ditutup." -ForegroundColor Green
 }

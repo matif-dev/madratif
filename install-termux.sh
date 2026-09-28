@@ -1,32 +1,25 @@
 #!/data/data/com.termux/files/usr/bin/bash
 #
-# MADRATIF - installer untuk HP (Termux, sisi controller).
-# Pakai:
-#   bash install-termux.sh
-#   # atau dengan URL repo kamu:
-#   bash install-termux.sh https://github.com/matif-dev/madratif
+# MADRATIF - installer untuk HP (Termux, sisi master/controller).
+#
+# Satu baris (ganti KODE dengan kode rahasiamu, sama dengan yang di PC):
+#   curl -s https://raw.githubusercontent.com/matif-dev/madratif/main/install-termux.sh | bash -s -- KODE
 #
 set -e
 
-echo "=== MADRATIF (Termux controller) ==="
-pkg update -y || true
+CODE="$1"
+
+echo "=== MADRATIF (Termux master) ==="
 pkg install -y python git
+pip install --upgrade "git+https://github.com/matif-dev/madratif"
 
-DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO="${1:-https://github.com/matif-dev/madratif}"
-
-if [ -f "$DIR/pyproject.toml" ]; then
-    echo "Menginstall dari folder lokal..."
-    pip install --upgrade "$DIR"
-else
-    echo "Menginstall dari GitHub: $REPO"
-    pip install --upgrade "git+$REPO"
+if [ -z "$CODE" ]; then
+    printf "Masukkan kode rahasia (sama dengan di PC): "
+    read CODE
 fi
 
-echo ""
-echo "Terinstall. Sekarang konfigurasi (samakan NETWORK KEY dengan PC kamu):"
-madratif setup
+madratif connect "$CODE"
 
 echo ""
-echo "Selesai. Coba jalankan:"
+echo "Siap! Langsung coba:"
 echo "  madratif clients"
