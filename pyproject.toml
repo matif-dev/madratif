@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "madratif"
+version = "0.1.0"
+description = "MADRATIF - kontrol PC pribadi dari jarak jauh (Termux/terminal) lewat MQTT"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "MADRATIF" }]
+keywords = ["remote", "control", "mqtt", "termux", "personal"]
+dependencies = [
+    "paho-mqtt>=2.0",
+]
+
+[project.scripts]
+madratif = "madratif.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
