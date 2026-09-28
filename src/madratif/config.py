@@ -20,6 +20,9 @@ DEFAULTS = {
     "username": "",
     "password": "",
     "tls": False,
+    "repo": "matif-dev/madratif",
+    "auto_update": True,
+    "update_interval": 600,
 }
 
 
@@ -63,6 +66,15 @@ def load() -> dict:
         cfg["password"] = env["MADRATIF_PASSWORD"]
     if env.get("MADRATIF_TLS"):
         cfg["tls"] = env["MADRATIF_TLS"].lower() in ("1", "true", "yes", "on")
+    if env.get("MADRATIF_REPO"):
+        cfg["repo"] = env["MADRATIF_REPO"]
+    if env.get("MADRATIF_AUTOUPDATE"):
+        cfg["auto_update"] = env["MADRATIF_AUTOUPDATE"].lower() in ("1", "true", "yes", "on")
+    if env.get("MADRATIF_UPDATE_INTERVAL"):
+        try:
+            cfg["update_interval"] = int(env["MADRATIF_UPDATE_INTERVAL"])
+        except ValueError:
+            pass
     return cfg
 
 

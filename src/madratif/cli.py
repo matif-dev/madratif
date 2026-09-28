@@ -17,6 +17,7 @@ Perintah controller (ketik ini di HP / Termux atau terminal pengontrol):
   madratif screensaver <client>       buka screensaver "MADRATIF" di client
   madratif status <client>            buka panel status di client
   madratif ping <client>              cek koneksi ke client
+  madratif update <client>            paksa client tarik versi terbaru & restart
 
 Perintah client (di PC yang mau dikontrol):
   madratif client start [--id NAMA]   jalankan agent (menunggu perintah)
@@ -184,6 +185,9 @@ def main(argv=None) -> int:
             print("Pakai: madratif ping <client>")
             return 2
         return controller.send_command(rest[0], "ping")
+    if cmd == "update":
+        target = rest[0] if rest else "all"
+        return controller.send_command(target, "update", wait=30.0)
 
     print(f"Perintah tidak dikenal: {cmd}\n")
     print(USAGE)

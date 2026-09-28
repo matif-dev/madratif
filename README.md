@@ -86,6 +86,33 @@ madratif ping client-1
 madratif screensaver all
 ```
 
+## Update otomatis
+
+Setiap client **mengecek repo GitHub secara berkala** (default tiap ~10 menit).
+Kalau ada commit baru di `main`, client menarik kode terbaru lalu **restart
+sendiri** - jadi kamu cukup:
+
+1. Edit/ tambah command di kode,
+2. `git push`,
+3. semua PC ikut ter-update otomatis (tanpa install ulang).
+
+Mau langsung tanpa nunggu? Paksa dari master:
+
+```bash
+madratif update nama-pc     # satu PC
+madratif update all         # semua PC
+```
+
+Catatan: update menarik & menjalankan kode dari repomu sendiri. Jaga akun GitHub
+kamu. Matikan lewat config: `auto_update: false` atau `update_interval: 0`.
+
+### Menambah command baru
+
+1. `actions.py` - tulis fungsi aksinya.
+2. `agent.py` - daftarkan di `_handle()`.
+3. `cli.py` - tambah perintah controller-nya.
+4. `git push` -> client update sendiri.
+
 ## Uninstall
 
 Di PC (PowerShell), satu baris:

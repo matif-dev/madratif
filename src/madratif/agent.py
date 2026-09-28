@@ -12,6 +12,7 @@ import time
 from . import actions
 from . import config as cfgmod
 from . import protocol as P
+from . import updater
 from .mqttc import make_client
 
 HEARTBEAT = 30  # seconds between presence refreshes
@@ -66,12 +67,44 @@ def run(client_id_override: str | None = None) -> int:
         print(f"[madratif] Client '{cid}' ONLINE - menunggu perintah ...")
         print(f"[madratif] Broker {cfg['broker']}:{cfg['port']}  network={nk}")
 
+    def _ack(reqid, action, ok, detail):
+        client.publish(
+            ack_t,
+            P.encode(
+                {
+                    "reqid": reqid,
+                    "client_id": cid,
+                    "action": action,
+                    "ok": ok,
+                    "detail": detail,
+                    "ts": P.now(),
+                }
+            ),
+            qos=1,
+        )
+
     def on_message(topic, payload):
         data = P.decode(payload) or {}
         action = data.get("action")
         args = data.get("args") or {}
         reqid = data.get("reqid")
         print(f"[madratif] perintah diterima: {action} {args}")
+
+        if action == "update":
+            try:
+                updated, detail = updater.check_and_apply(cfg, force=True)
+            except Exception as exc:  # noqa: BLE001
+                updated, detail = False, f"error: {exc}"
+            _ack(reqid, action, True, detail)
+            print(f"[madratif]  -> {detail}")
+            if updated:
+                try:
+                    client.publish(presence, _presence_payload(cid, "offline"), qos=1, retain=True)
+                except Exception:
+                    pass
+                threading.Timer(1.0, updater.restart).start()
+            return
+
         ok, detail = _handle(action, args)
         client.publish(
             ack_t,
@@ -100,6 +133,25 @@ def run(client_id_override: str | None = None) -> int:
             except Exception:
                 pass
 
+    def autoupdate_loop():
+        interval = int(cfg.get("update_interval") or 0)
+        if interval <= 0:
+            return
+        while True:
+            try:
+                updated, msg = updater.check_and_apply(cfg, force=False)
+                if updated:
+                    print(f"[madratif] {msg} - restart untuk memuat versi baru...")
+                    try:
+                        client.publish(presence, _presence_payload(cid, "offline"), qos=1, retain=True)
+                    except Exception:
+                        pass
+                    time.sleep(0.5)
+                    updater.restart()
+            except Exception:
+                pass
+            time.sleep(interval)
+
     try:
         client.connect(cfg["broker"], int(cfg["port"]), keepalive=45)
     except Exception as exc:  # noqa: BLE001
@@ -107,6 +159,8 @@ def run(client_id_override: str | None = None) -> int:
         print("[madratif] Akan terus mencoba menyambung ulang...")
 
     threading.Thread(target=heartbeat_loop, daemon=True).start()
+    if cfg.get("auto_update"):
+        threading.Thread(target=autoupdate_loop, daemon=True).start()
 
     try:
         client.loop_forever()
