@@ -34,41 +34,30 @@ Pakai `all` sebagai `<client>` untuk mengirim ke semua PC sekaligus.
 - **Network key** adalah kata sandi acak yang mengisolasi device kamu di broker.
   Semua device kamu harus memakai network key yang **sama**.
 
-## Install di PC (Windows) - sisi client
+## Install di PC (Windows) - sisi client (ALL-IN-ONE)
 
-Buka **PowerShell** di PC yang mau dikontrol, lalu (dari folder repo yang sudah
-di-clone / di-download):
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install.ps1 -ClientId client-1
-```
-
-Atau langsung dari GitHub (ganti `matif-dev`):
+Buka **PowerShell**, jalankan **satu baris** ini. Tidak perlu install Python
+atau apa pun dulu - Windows yang baru pun langsung bisa:
 
 ```powershell
 irm https://raw.githubusercontent.com/matif-dev/madratif/main/install.ps1 | iex
 ```
 
-Installer akan: memastikan Python ada, meng-install paket, membuat network key
-(kalau belum ada), dan menyimpan konfigurasi. Catat **network key** yang muncul.
+Yang terjadi otomatis:
+- Kalau Python belum ada -> diunduh versi **portable** (tanpa admin, tanpa pip).
+- Kode MADRATIF diunduh (murni standard library, **tanpa dependency**).
+- Kamu ditanya **network key** (Enter = dibuat otomatis) dan nama client.
+- Dipasang **autostart** (jalan sendiri & tersembunyi saat login) lalu langsung
+  dijalankan.
 
-Jalankan client (menunggu perintah):
+Catat **network key** yang muncul - itu yang dipakai di HP.
 
-```powershell
-python -m madratif client start
-```
-
-Ingin otomatis jalan saat login? Tambahkan `-Autostart` saat install:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install.ps1 -ClientId client-1 -Autostart
-```
-
-Punya beberapa PC? Install di tiap PC dengan **network key yang sama** tapi
-`-ClientId` berbeda (`client-1`, `client-2`, ...):
+Punya beberapa PC? Jalankan baris yang sama di tiap PC, isi **network key yang
+sama**, beri nama client berbeda (`client-1`, `client-2`, ...). Mau tanpa
+tanya-jawab? Set dulu:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install.ps1 -NetworkKey <KEY-SAMA> -ClientId client-2
+$env:MADRATIF_KEY="kunci-sama"; $env:MADRATIF_CLIENT_ID="client-2"; irm https://raw.githubusercontent.com/matif-dev/madratif/main/install.ps1 | iex
 ```
 
 ## Install di HP (Termux) - sisi controller
@@ -102,12 +91,16 @@ madratif screensaver all
 
 ## Uninstall
 
-Di PC (PowerShell):
+Di PC (PowerShell), satu baris:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
-# hapus sekalian konfigurasinya:
-powershell -ExecutionPolicy Bypass -File .\uninstall.ps1 -Purge
+irm https://raw.githubusercontent.com/matif-dev/madratif/main/uninstall.ps1 | iex
+```
+
+Untuk sekalian hapus konfigurasi (network key):
+
+```powershell
+$env:MADRATIF_PURGE="1"; irm https://raw.githubusercontent.com/matif-dev/madratif/main/uninstall.ps1 | iex
 ```
 
 Di Termux:
@@ -143,6 +136,9 @@ Ubah kapan saja dengan `madratif setup`, atau lewat environment variable
   username/password + TLS (isi `username`, `password`, `tls: true`, `port: 8883`).
 - Kumpulan aksi sengaja dibatasi dan tetap (allowlist). Tidak ada fitur untuk
   menjalankan perintah sembarang, mengambil file, atau menyembunyikan diri.
+- **Tanpa dependency pihak ketiga**: aplikasi ini murni standard library Python
+  (punya klien MQTT mini sendiri di `mqtt_mini.py`), jadi bisa jalan di Python
+  portable tanpa pip.
 
 ## Menambah fitur nanti
 

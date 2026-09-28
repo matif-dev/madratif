@@ -1,123 +1,159 @@
 <#
-  MADRATIF - installer untuk PC Windows (client).
-  Jalankan di PowerShell:
+  MADRATIF - installer ALL-IN-ONE untuk client Windows.
 
-    # dari folder repo yang sudah di-clone:
-    powershell -ExecutionPolicy Bypass -File .\install.ps1
+  Cukup jalankan SATU baris ini di PowerShell (Windows baru pun bisa):
 
-    # atau langsung dari internet (ganti URL repo kamu):
     irm https://raw.githubusercontent.com/matif-dev/madratif/main/install.ps1 | iex
 
-  Parameter opsional:
-    -NetworkKey  <key>    samakan dengan device lain (kosong = dibuat acak)
-    -ClientId    <nama>   nama client, mis. client-1  (default: nama komputer)
-    -Broker      <host>   default broker.emqx.io
-    -Port        <int>    default 1883
-    -Autostart            jalankan client otomatis saat login
-    -RepoUrl     <url>    URL repo GitHub kamu
+  - Tidak perlu install Python duluan: kalau belum ada, otomatis diunduh
+    versi portable (tanpa admin).
+  - Tidak perlu pip: aplikasinya murni standard library.
+  - Otomatis dikonfigurasi, dipasang autostart, dan langsung dijalankan.
+
+  Opsi lewat environment variable (opsional, untuk tanpa tanya-jawab):
+    $env:MADRATIF_KEY        = "kunci-sama-untuk-semua-device"
+    $env:MADRATIF_CLIENT_ID  = "client-1"
+    $env:MADRATIF_NOAUTOSTART = "1"   # jangan pasang autostart
+    $env:MADRATIF_NOSTART     = "1"   # jangan langsung jalankan
 #>
-[CmdletBinding()]
-param(
-    [string]$NetworkKey = "",
-    [string]$ClientId = "",
-    [string]$Broker = "broker.emqx.io",
-    [int]$Port = 1883,
-    [switch]$Autostart,
-    [string]$RepoUrl = "https://github.com/matif-dev/madratif"
-)
 
-$ErrorActionPreference = "Stop"
-Write-Host "=== MADRATIF installer ===" -ForegroundColor Cyan
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
 
-function Get-Python {
-    foreach ($c in @("python", "py")) {
+Write-Host ""
+Write-Host "=== MADRATIF - install all-in-one (client) ===" -ForegroundColor Cyan
+
+$base = Join-Path $env:LOCALAPPDATA 'madratif'
+$lib = Join-Path $base 'lib'
+New-Item -ItemType Directory -Force -Path $base | Out-Null
+
+# --- 1. Python: pakai yang ada, kalau tidak ada unduh portable -------------
+function Get-WorkingPython {
+    foreach ($c in @('python', 'py')) {
         try {
-            $null = & $c --version 2>&1
-            if ($LASTEXITCODE -eq 0) { return $c }
+            $exe = (& $c -c "import sys;print(sys.executable)" 2>$null)
+            if ($LASTEXITCODE -eq 0 -and $exe) { return $exe.Trim() }
         } catch {}
     }
     return $null
 }
 
-$py = Get-Python
-if (-not $py) {
-    Write-Host "Python tidak ditemukan. Mencoba install lewat winget..." -ForegroundColor Yellow
-    try {
-        winget install -e --id Python.Python.3.12 --accept-source-agreements --accept-package-agreements
-    } catch {
-        Write-Host "Gagal auto-install. Install Python dari https://www.python.org/downloads/ (centang 'Add to PATH'), lalu jalankan ulang." -ForegroundColor Red
-        exit 1
+$pyExe = Get-WorkingPython
+$embeddable = $false
+if (-not $pyExe) {
+    Write-Host "Python belum ada - mengunduh Python portable (sekali saja)..." -ForegroundColor Yellow
+    $emb = Join-Path $base 'python'
+    $pyExe = Join-Path $emb 'python.exe'
+    if (-not (Test-Path $pyExe)) {
+        $zip = Join-Path $base 'python-portable.zip'
+        Invoke-WebRequest 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip' -OutFile $zip -UseBasicParsing
+        New-Item -ItemType Directory -Force -Path $emb | Out-Null
+        Expand-Archive $zip -DestinationPath $emb -Force
+        Remove-Item $zip -Force
     }
-    $py = Get-Python
-    if (-not $py) {
-        Write-Host "Python masih belum terdeteksi. Tutup lalu buka terminal baru dan ulangi." -ForegroundColor Red
-        exit 1
-    }
+    $embeddable = $true
 }
-Write-Host "Python: $(& $py --version)" -ForegroundColor Green
+Write-Host "Python: $pyExe" -ForegroundColor Green
 
-# --- install paket ---
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$localPkg = Join-Path $scriptDir "pyproject.toml"
-if (Test-Path $localPkg) {
-    Write-Host "Menginstall dari folder lokal..." -ForegroundColor Cyan
-    & $py -m pip install --user --upgrade "$scriptDir"
+# --- 2. Unduh kode MADRATIF (tanpa dependency, tanpa pip) ------------------
+Write-Host "Mengunduh MADRATIF..." -ForegroundColor Cyan
+$srcZip = Join-Path $base 'madratif-src.zip'
+Invoke-WebRequest 'https://github.com/matif-dev/madratif/archive/refs/heads/main.zip' -OutFile $srcZip -UseBasicParsing
+$ext = Join-Path $base 'extract'
+if (Test-Path $ext) { Remove-Item $ext -Recurse -Force }
+Expand-Archive $srcZip -DestinationPath $ext -Force
+Remove-Item $srcZip -Force
+$srcPkg = Join-Path $ext 'madratif-main\src\madratif'
+
+if ($embeddable) {
+    $pkgDest = Join-Path (Split-Path $pyExe -Parent) 'madratif'
+    $pyPathForRun = ''
 } else {
-    Write-Host "Menginstall dari GitHub: $RepoUrl" -ForegroundColor Cyan
-    & $py -m pip install --user --upgrade "git+$RepoUrl"
+    New-Item -ItemType Directory -Force -Path $lib | Out-Null
+    $pkgDest = Join-Path $lib 'madratif'
+    $pyPathForRun = $lib
 }
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "pip install gagal." -ForegroundColor Red
-    exit 1
+if (Test-Path $pkgDest) { Remove-Item $pkgDest -Recurse -Force }
+Copy-Item $srcPkg $pkgDest -Recurse -Force
+Remove-Item $ext -Recurse -Force
+Write-Host "Kode terpasang." -ForegroundColor Green
+
+# --- 3. Konfigurasi -------------------------------------------------------
+$key = $env:MADRATIF_KEY
+if (-not $key -and [Environment]::UserInteractive) {
+    $key = Read-Host "Network key (Enter = buat baru; harus SAMA di semua device)"
+}
+if (-not $key) {
+    $key = [guid]::NewGuid().ToString('n').Substring(0, 16)
+    Write-Host "Network key baru dibuat otomatis." -ForegroundColor Yellow
 }
 
-# --- konfigurasi ---
-if (-not $ClientId) { $ClientId = ($env:COMPUTERNAME).ToLower() }
-if (-not $NetworkKey) {
-    $NetworkKey = (& $py -c "import secrets;print(secrets.token_urlsafe(9))").Trim()
-    Write-Host "Network key dibuat otomatis: $NetworkKey" -ForegroundColor Yellow
+$cid = $env:MADRATIF_CLIENT_ID
+$cidDefault = $env:COMPUTERNAME.ToLower()
+if (-not $cid -and [Environment]::UserInteractive) {
+    $cid = Read-Host "Nama client (Enter = $cidDefault)"
 }
+if (-not $cid) { $cid = $cidDefault }
 
-$cfgDir = Join-Path $env:USERPROFILE ".madratif"
+$cfgDir = Join-Path $env:USERPROFILE '.madratif'
 New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
 $cfg = [ordered]@{
-    broker      = $Broker
-    port        = $Port
-    network_key = $NetworkKey
-    client_id   = $ClientId
-    username    = ""
-    password    = ""
-    tls         = $false
+    broker = 'broker.emqx.io'; port = 1883; network_key = $key;
+    client_id = $cid; username = ''; password = ''; tls = $false
 }
-($cfg | ConvertTo-Json) | Out-File -FilePath (Join-Path $cfgDir "config.json") -Encoding utf8
-Write-Host "Config disimpan: $cfgDir\config.json" -ForegroundColor Green
+($cfg | ConvertTo-Json) | Out-File (Join-Path $cfgDir 'config.json') -Encoding utf8
 
-# --- autostart opsional ---
-if ($Autostart) {
-    $startup = [Environment]::GetFolderPath("Startup")
-    $vbs = Join-Path $cfgDir "madratif-autostart.vbs"
-    $pythonw = (& $py -c "import sys,os;print(os.path.join(os.path.dirname(sys.executable),'pythonw.exe'))").Trim()
-    if (-not (Test-Path $pythonw)) { $pythonw = "pythonw" }
+# --- 4. Launcher (shim) ---------------------------------------------------
+$pythonw = $pyExe -replace 'python\.exe$', 'pythonw.exe'
+if (-not (Test-Path $pythonw)) { $pythonw = $pyExe }
+
+$agentCmd = Join-Path $base 'agent.cmd'
+@"
+@echo off
+set "PYTHONPATH=$pyPathForRun"
+"$pythonw" -m madratif client start
+"@ | Out-File $agentCmd -Encoding ascii
+
+$madratifCmd = Join-Path $base 'madratif.cmd'
+@"
+@echo off
+set "PYTHONPATH=$pyPathForRun"
+"$pyExe" -m madratif %*
+"@ | Out-File $madratifCmd -Encoding ascii
+
+# --- 5. Autostart ---------------------------------------------------------
+if (-not $env:MADRATIF_NOAUTOSTART) {
+    $startup = [Environment]::GetFolderPath('Startup')
+    $vbs = Join-Path $base 'autostart.vbs'
     @"
 Set s = CreateObject("Wscript.Shell")
-s.Run "$pythonw -m madratif client start", 0, False
-"@ | Out-File -FilePath $vbs -Encoding ascii
-    $lnk = Join-Path $startup "MADRATIF.lnk"
+s.Run "cmd /c " & Chr(34) & "$agentCmd" & Chr(34), 0, False
+"@ | Out-File $vbs -Encoding ascii
+    $lnk = Join-Path $startup 'MADRATIF.lnk'
     $ws = New-Object -ComObject WScript.Shell
     $sc = $ws.CreateShortcut($lnk)
-    $sc.TargetPath = "wscript.exe"
-    $sc.Arguments = "`"$vbs`""
+    $sc.TargetPath = 'wscript.exe'
+    $sc.Arguments = """$vbs"""
     $sc.Save()
-    Write-Host "Autostart aktif (folder Startup). Client jalan otomatis saat login." -ForegroundColor Green
+    Write-Host "Autostart aktif (jalan otomatis & tersembunyi saat login)." -ForegroundColor Green
 }
 
+# --- 6. Ringkasan + jalankan ----------------------------------------------
 Write-Host ""
 Write-Host "SELESAI." -ForegroundColor Cyan
-Write-Host "  Network key : $NetworkKey"
-Write-Host "  Client ID   : $ClientId"
-Write-Host "  Broker      : $Broker`:$Port"
+Write-Host "  Network key : $key" -ForegroundColor Yellow
+Write-Host "  Client ID   : $cid"
+Write-Host "  Broker      : broker.emqx.io:1883"
 Write-Host ""
-Write-Host "Jalankan client sekarang (menunggu perintah dari HP):" -ForegroundColor Yellow
-Write-Host "  $py -m madratif client start"
+Write-Host "SIMPAN network key di atas - pakai yang SAMA di HP (Termux)." -ForegroundColor Yellow
 Write-Host ""
-Write-Host "Di HP (Termux), pakai NETWORK KEY yang sama: $NetworkKey" -ForegroundColor Yellow
+
+if ($env:MADRATIF_NOSTART) {
+    Write-Host "Jalankan client kapan saja lewat:  $agentCmd"
+} else {
+    Write-Host "Menjalankan client sekarang..." -ForegroundColor Cyan
+    $env:PYTHONPATH = $pyPathForRun
+    Start-Process -FilePath $pyExe -ArgumentList @('-m', 'madratif', 'client', 'start')
+    Write-Host "Client jalan di jendela baru. Boleh ditutup - nanti otomatis jalan lagi saat login."
+}

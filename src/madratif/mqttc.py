@@ -1,20 +1,13 @@
-"""Small factory that builds a configured paho-mqtt (v2) client."""
+"""Factory that builds a configured MiniMQTT client (no third-party deps)."""
 
 from __future__ import annotations
 
-import ssl
-
-import paho.mqtt.client as mqtt
+from .mqtt_mini import MiniMQTT
 
 
-def make_client(cfg: dict, client_id: str, clean_session: bool = True):
-    client = mqtt.Client(
-        mqtt.CallbackAPIVersion.VERSION2,
-        client_id=client_id,
-        clean_session=clean_session,
-    )
+def make_client(cfg: dict, client_id: str, keepalive: int = 45) -> MiniMQTT:
+    client = MiniMQTT(client_id, keepalive=keepalive)
+    client.tls = bool(cfg.get("tls"))
     if cfg.get("username"):
-        client.username_pw_set(cfg["username"], cfg.get("password") or None)
-    if cfg.get("tls"):
-        client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
+        client.set_auth(cfg["username"], cfg.get("password"))
     return client

@@ -18,28 +18,29 @@ def _need_key(cfg: dict) -> bool:
     return True
 
 
+def _connect(cfg, client_id, on_message):
+    client = make_client(cfg, client_id, keepalive=30)
+    client.on_message = on_message
+    client.connect(cfg["broker"], int(cfg["port"]), keepalive=30)
+    return client
+
+
 def _discover(cfg: dict, nk: str, timeout: float = 1.5):
     found: dict = {}
 
-    def on_connect(c, _u, _f, _rc, _p=None):
-        c.subscribe(P.presence_wildcard(nk), qos=1)
-
-    def on_message(_c, _u, msg):
-        cid = P.client_from_presence(msg.topic)
-        data = P.decode(msg.payload) or {}
+    def on_message(topic, payload):
+        cid = P.client_from_presence(topic)
+        data = P.decode(payload) or {}
         if cid and data.get("status") == "online":
             found[cid] = data
 
-    client = make_client(cfg, f"madratif-disc-{secrets.token_hex(3)}")
-    client.on_connect = on_connect
-    client.on_message = on_message
     try:
-        client.connect(cfg["broker"], int(cfg["port"]), keepalive=30)
+        client = _connect(cfg, f"madratif-disc-{secrets.token_hex(3)}", on_message)
     except Exception:
         return []
+    client.subscribe(P.presence_wildcard(nk), qos=1)
     client.loop_start()
     time.sleep(timeout)
-    client.loop_stop()
     client.disconnect()
     return sorted(found)
 
@@ -51,31 +52,25 @@ def list_clients(timeout: float = 2.0) -> int:
     nk = cfg["network_key"]
     found: dict = {}
 
-    def on_connect(c, _u, _f, _rc, _p=None):
-        c.subscribe(P.presence_wildcard(nk), qos=1)
-
-    def on_message(_c, _u, msg):
-        cid = P.client_from_presence(msg.topic)
-        data = P.decode(msg.payload) or {}
+    def on_message(topic, payload):
+        cid = P.client_from_presence(topic)
+        data = P.decode(payload) or {}
         if cid:
             found[cid] = data
 
-    client = make_client(cfg, f"madratif-ctl-{secrets.token_hex(3)}")
-    client.on_connect = on_connect
-    client.on_message = on_message
     try:
-        client.connect(cfg["broker"], int(cfg["port"]), keepalive=30)
+        client = _connect(cfg, f"madratif-ctl-{secrets.token_hex(3)}", on_message)
     except Exception as exc:  # noqa: BLE001
         print(f"Tidak bisa connect ke broker: {exc}")
         return 1
+    client.subscribe(P.presence_wildcard(nk), qos=1)
     client.loop_start()
     time.sleep(timeout)
-    client.loop_stop()
     client.disconnect()
 
     if not found:
         print("Tidak ada client terdeteksi.")
-        print("Pastikan client sudah menjalankan 'madratif client start' dan network key sama.")
+        print("Pastikan client sudah menjalankan agent dan network key sama.")
         return 0
 
     print(f"\n  CLIENTS  (network: {nk})")
@@ -109,43 +104,33 @@ def send_command(client_id: str, action: str, args: dict | None = None, wait: fl
     reqid = secrets.token_hex(4)
     acks: dict = {}
     done = threading.Event()
-    subscribed = threading.Event()
 
-    def on_connect(c, _u, _f, _rc, _p=None):
-        c.subscribe([(P.ack_topic(nk, t), 1) for t in targets])
-
-    def on_subscribe(_c, _u, _mid, _rc, _p=None):
-        subscribed.set()
-
-    def on_message(_c, _u, msg):
-        data = P.decode(msg.payload) or {}
+    def on_message(topic, payload):
+        data = P.decode(payload) or {}
         if data.get("reqid") == reqid:
             acks[data.get("client_id")] = data
             if len(acks) >= len(targets):
                 done.set()
 
-    client = make_client(cfg, f"madratif-ctl-{secrets.token_hex(3)}")
-    client.on_connect = on_connect
-    client.on_subscribe = on_subscribe
-    client.on_message = on_message
     try:
-        client.connect(cfg["broker"], int(cfg["port"]), keepalive=30)
+        client = _connect(cfg, f"madratif-ctl-{secrets.token_hex(3)}", on_message)
     except Exception as exc:  # noqa: BLE001
         print(f"Tidak bisa connect ke broker: {exc}")
         return 1
 
+    # Subscribe to the ack topics BEFORE publishing the command. Both go out on
+    # the same TCP connection in order, so the subscription is registered at the
+    # broker before the command is delivered -> no missed acks.
+    for t in targets:
+        client.subscribe(P.ack_topic(nk, t), qos=1)
     client.loop_start()
-    if not subscribed.wait(timeout=8.0):  # only publish once we're truly listening for acks
-        client.loop_stop()
-        client.disconnect()
-        print("Gagal connect/subscribe ke broker (cek koneksi internet).")
-        return 1
+
     payload = P.encode({"action": action, "args": args, "reqid": reqid, "ts": P.now()})
     for t in targets:
         client.publish(P.cmd_topic(nk, t), payload, qos=1)
         print(f"-> kirim '{action}' ke {t} ...")
+
     done.wait(timeout=wait)
-    client.loop_stop()
     client.disconnect()
 
     if not acks:

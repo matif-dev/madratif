@@ -1,36 +1,35 @@
 <#
-  MADRATIF - uninstaller untuk PC Windows.
-  Jalankan:
-    powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
-  Tambah -Purge untuk sekalian menghapus konfigurasi (~/.madratif).
+  MADRATIF - uninstaller ALL-IN-ONE. Jalankan satu baris:
+
+    irm https://raw.githubusercontent.com/matif-dev/madratif/main/uninstall.ps1 | iex
+
+  Untuk sekalian hapus konfigurasi (network key), set dulu:
+    $env:MADRATIF_PURGE = "1"
 #>
-[CmdletBinding()]
-param([switch]$Purge)
 
+$ErrorActionPreference = 'SilentlyContinue'
 Write-Host "=== MADRATIF uninstall ===" -ForegroundColor Cyan
-$ErrorActionPreference = "SilentlyContinue"
 
-# hentikan agent yang sedang jalan
+# 1. hentikan agent yang sedang jalan
 Get-CimInstance Win32_Process -Filter "Name like '%python%'" |
-    Where-Object { $_.CommandLine -like "*madratif*client*" } |
+    Where-Object { $_.CommandLine -like '*madratif*client*' } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
 
-# hapus autostart
-$startup = [Environment]::GetFolderPath("Startup")
-Remove-Item (Join-Path $startup "MADRATIF.lnk") -Force
-$cfgDir = Join-Path $env:USERPROFILE ".madratif"
-Remove-Item (Join-Path $cfgDir "madratif-autostart.vbs") -Force
+# 2. hapus autostart
+$startup = [Environment]::GetFolderPath('Startup')
+Remove-Item (Join-Path $startup 'MADRATIF.lnk') -Force
 
-# pilih python
-$py = "python"
-try { $null = & $py --version 2>&1; if ($LASTEXITCODE -ne 0) { $py = "py" } } catch { $py = "py" }
+# 3. hapus folder aplikasi
+$base = Join-Path $env:LOCALAPPDATA 'madratif'
+Remove-Item $base -Recurse -Force
 
-# uninstall paket
-& $py -m pip uninstall -y madratif
-
-if ($Purge) {
-    Remove-Item -Recurse -Force $cfgDir
-    Write-Host "Konfigurasi dihapus." -ForegroundColor Yellow
+# 4. konfigurasi
+$cfgDir = Join-Path $env:USERPROFILE '.madratif'
+if ($env:MADRATIF_PURGE) {
+    Remove-Item $cfgDir -Recurse -Force
+    Write-Host "Konfigurasi (network key) ikut dihapus." -ForegroundColor Yellow
+} else {
+    Write-Host "Konfigurasi disimpan di $cfgDir (set MADRATIF_PURGE=1 untuk hapus juga)." -ForegroundColor DarkGray
 }
 
-Write-Host "MADRATIF sudah dihapus." -ForegroundColor Green
+Write-Host "MADRATIF sudah dihapus dari PC ini." -ForegroundColor Green

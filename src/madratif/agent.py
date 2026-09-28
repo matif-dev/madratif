@@ -57,27 +57,23 @@ def run(client_id_override: str | None = None) -> int:
     cmd_t = P.cmd_topic(nk, cid)
     ack_t = P.ack_topic(nk, cid)
 
-    mqtt_id = f"madratif-agent-{cid}-{secrets.token_hex(3)}"
-    client = make_client(cfg, mqtt_id, clean_session=True)
-    client.will_set(presence, _presence_payload(cid, "offline"), qos=1, retain=True)
+    client = make_client(cfg, f"madratif-agent-{cid}-{secrets.token_hex(3)}", keepalive=45)
+    client.set_will(presence, _presence_payload(cid, "offline"), qos=1, retain=True)
 
-    def on_connect(c, _userdata, _flags, reason_code, _properties=None):
-        if getattr(reason_code, "is_failure", False):
-            print(f"[madratif] Gagal connect: {reason_code}")
-            return
+    def on_connect(c):
         c.publish(presence, _presence_payload(cid, "online"), qos=1, retain=True)
         c.subscribe(cmd_t, qos=1)
         print(f"[madratif] Client '{cid}' ONLINE - menunggu perintah ...")
         print(f"[madratif] Broker {cfg['broker']}:{cfg['port']}  network={nk}")
 
-    def on_message(c, _userdata, msg):
-        data = P.decode(msg.payload) or {}
+    def on_message(topic, payload):
+        data = P.decode(payload) or {}
         action = data.get("action")
         args = data.get("args") or {}
         reqid = data.get("reqid")
         print(f"[madratif] perintah diterima: {action} {args}")
         ok, detail = _handle(action, args)
-        c.publish(
+        client.publish(
             ack_t,
             P.encode(
                 {
@@ -108,7 +104,7 @@ def run(client_id_override: str | None = None) -> int:
         client.connect(cfg["broker"], int(cfg["port"]), keepalive=45)
     except Exception as exc:  # noqa: BLE001
         print(f"[madratif] Tidak bisa connect ke broker: {exc}")
-        return 1
+        print("[madratif] Akan terus mencoba menyambung ulang...")
 
     threading.Thread(target=heartbeat_loop, daemon=True).start()
 
@@ -118,7 +114,7 @@ def run(client_id_override: str | None = None) -> int:
         print("\n[madratif] Menutup - mengirim status offline.")
         try:
             client.publish(presence, _presence_payload(cid, "offline"), qos=1, retain=True)
-            client.disconnect()
         except Exception:
             pass
+        client.disconnect()
     return 0
