@@ -9,6 +9,7 @@ import socket
 import threading
 import time
 
+from . import __version__
 from . import actions
 from . import config as cfgmod
 from . import protocol as P
@@ -40,7 +41,7 @@ def _handle(action: str, args: dict):
             return True, actions.open_status_panel()
         if action == "ping":
             info = actions.system_summary()
-            return True, f"pong dari {info['host']} ({info['os']})"
+            return True, f"pong dari {info['host']} ({info['os']}) v{__version__}"
         return False, f"aksi tidak dikenal: {action}"
     except Exception as exc:  # noqa: BLE001 - report any failure back to controller
         return False, f"error: {exc}"
