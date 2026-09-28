@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import urllib.request
@@ -114,8 +115,8 @@ def check_and_apply(cfg: dict, force: bool = False, pkg_dir: str | None = None):
             return False, "baseline disimpan"
         if sha == stored:
             return False, "sudah terbaru"
-    elif sha and stored and sha == stored:
-        return False, "sudah versi terbaru"
+    # force=True selalu tarik ulang (zip codeload selalu fresh, tidak seperti
+    # feed atom yang bisa telat beberapa menit)
 
     apply_update(cfg, pkg_dir)
     if sha:
@@ -124,8 +125,23 @@ def check_and_apply(cfg: dict, force: bool = False, pkg_dir: str | None = None):
 
 
 def restart() -> None:
+    """Launch a fresh agent process with the new code, then exit this one.
+
+    A detached Popen + os._exit is far more reliable on Windows than os.execv
+    (which misbehaves when the agent runs as a hidden pythonw process).
+    """
+    args = [sys.executable, "-m", "madratif"] + sys.argv[1:]
+    kwargs = {"close_fds": True}
+    if os.name == "nt":
+        DETACHED_PROCESS = 0x00000008
+        CREATE_NEW_PROCESS_GROUP = 0x00000200
+        kwargs["creationflags"] = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
     try:
-        sys.stdout.flush()
+        subprocess.Popen(args, **kwargs)
     except Exception:
-        pass
-    os.execv(sys.executable, [sys.executable, "-m", "madratif"] + sys.argv[1:])
+        # last resort: try to exec in place
+        try:
+            os.execv(sys.executable, args)
+        except Exception:
+            return
+    os._exit(0)
