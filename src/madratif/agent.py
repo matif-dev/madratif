@@ -3,11 +3,14 @@ fixed set of commands, and reports its presence."""
 
 from __future__ import annotations
 
+import os
 import platform
 import secrets
 import socket
+import subprocess
 import threading
 import time
+from collections import deque
 
 from . import __version__
 from . import actions
@@ -17,6 +20,37 @@ from . import updater
 from .mqttc import make_client
 
 HEARTBEAT = 30  # seconds between presence refreshes
+
+
+def _terminate_other_agents():
+    """Singleton per machine: kill any OTHER 'madratif client start' process so
+    a command never gets executed twice (e.g. after a re-install that left an
+    old agent running)."""
+    if os.name != "nt":
+        return
+    mypid = str(os.getpid())
+    # Kill only OTHER agents that STARTED BEFORE me (older CreationDate). PIDs
+    # are not monotonic on Windows, so compare start time instead. This is a
+    # total order -> deterministic newest-wins, and two agents can never kill
+    # each other down to zero.
+    ps = (
+        "$p=Get-CimInstance Win32_Process -Filter 'ProcessId=" + mypid + "';"
+        "if($p){$t=$p.CreationDate;"
+        "Get-CimInstance Win32_Process -Filter \"Name like '%python%'\" |"
+        " Where-Object { $_.CommandLine -like '*madratif*client*start*'"
+        " -and $_.ProcessId -ne " + mypid + " -and $_.CreationDate -lt $t } |"
+        " ForEach-Object { Stop-Process -Id $_.ProcessId -Force }}"
+    )
+    try:
+        subprocess.run(
+            ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps],
+            creationflags=0x08000000,  # CREATE_NO_WINDOW
+            timeout=20,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
 
 
 def _presence_payload(cid: str, status: str) -> bytes:
@@ -82,9 +116,13 @@ def run(client_id_override: str | None = None) -> int:
         print("[madratif] Belum dikonfigurasi. Jalankan:  madratif setup")
         return 2
 
+    # make sure no other agent is already running on this machine
+    _terminate_other_agents()
+
     cid = client_id_override or cfg.get("client_id") or cfgmod.default_client_id()
     nk = cfg["network_key"]
     presence = P.presence_topic(nk, cid)
+    seen_reqids: deque = deque(maxlen=128)
     cmd_t = P.cmd_topic(nk, cid)
     ack_t = P.ack_topic(nk, cid)
 
@@ -118,6 +156,10 @@ def run(client_id_override: str | None = None) -> int:
         action = data.get("action")
         args = data.get("args") or {}
         reqid = data.get("reqid")
+        if reqid:
+            if reqid in seen_reqids:
+                return  # perintah yang sama sudah diproses (hindari dobel)
+            seen_reqids.append(reqid)
         print(f"[madratif] perintah diterima: {action} {args}")
 
         if action == "update":
