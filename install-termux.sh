@@ -11,7 +11,9 @@ CODE="$1"
 
 echo "=== MADRATIF (Termux master) ==="
 pkg install -y python git
-pip install --upgrade "git+https://github.com/matif-dev/madratif"
+# --force-reinstall --no-cache-dir supaya SELALU dapat versi terbaru dari repo
+# (kalau tidak, pip bisa melewati update karena nomor versi kebetulan sama).
+pip install --upgrade --force-reinstall --no-cache-dir "git+https://github.com/matif-dev/madratif"
 
 if [ -z "$CODE" ]; then
     printf "Masukkan kode rahasia (sama dengan di PC): "
