@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 
 from . import config as cfgmod
-from .screensaver import enable_vt
+from .screensaver import bring_to_front, enable_vt
 
 RESET = "\033[0m"
 HIDE = "\033[?25l"
@@ -37,6 +37,7 @@ def _local_ip() -> str:
 
 def run() -> int:
     enable_vt()
+    bring_to_front()
     cfg = cfgmod.load()
     cid = cfg.get("client_id") or cfgmod.default_client_id()
     host = socket.gethostname()

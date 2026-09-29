@@ -71,6 +71,58 @@ def enable_vt():
         pass
 
 
+def bring_to_front(hwnd=None):
+    """Bring a console window to the foreground and keep it topmost."""
+    if os.name != "nt" or os.environ.get("MADRATIF_PRANK_FRAMES"):
+        return
+    try:
+        import ctypes
+
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        if hwnd is None:
+            hwnd = kernel32.GetConsoleWindow()
+        if not hwnd:
+            return
+        # tap ALT to lift the SetForegroundWindow lock, then force to top
+        user32.keybd_event(0x12, 0, 0, 0)
+        user32.keybd_event(0x12, 0, 2, 0)
+        HWND_TOPMOST = -1
+        SWP_NOMOVE = 0x0002
+        SWP_NOSIZE = 0x0001
+        SWP_SHOWWINDOW = 0x0040
+        user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
+        user32.SetForegroundWindow(hwnd)
+        user32.BringWindowToTop(hwnd)
+    except Exception:
+        pass
+
+
+def go_fullscreen():
+    """Make this console borderless and cover the whole screen (topmost)."""
+    if os.name != "nt" or os.environ.get("MADRATIF_PRANK_FRAMES"):
+        return
+    try:
+        import ctypes
+
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        hwnd = kernel32.GetConsoleWindow()
+        if not hwnd:
+            return
+        GWL_STYLE = -16
+        WS_POPUP = 0x80000000
+        WS_VISIBLE = 0x10000000
+        style = WS_POPUP | WS_VISIBLE
+        if style >= 0x80000000:  # convert to signed 32-bit for SetWindowLongW
+            style -= 0x100000000
+        user32.SetWindowLongW(hwnd, GWL_STYLE, style)
+        user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE -> borderless popup fills the monitor
+        bring_to_front(hwnd)
+    except Exception:
+        pass
+
+
 def _term_size():
     size = shutil.get_terminal_size((80, 24))
     return max(size.columns, 10), max(size.lines, 8)
@@ -78,6 +130,7 @@ def _term_size():
 
 def run(text: str = "MADRATIF") -> int:
     enable_vt()
+    go_fullscreen()
     banner, bw = build_banner(text)
     bh = GLYPH_H
     out = sys.stdout.write

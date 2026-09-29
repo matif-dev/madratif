@@ -32,15 +32,18 @@ def _normalize_url(url: str) -> str:
 
 def open_chrome(url: str, fullscreen: bool = False) -> str:
     target = _normalize_url(url)
-    extra = ["--new-window", "--start-fullscreen"] if fullscreen else []
+    # --guest = jendela tamu: tanpa profil, tanpa pemilihan akun / login.
+    extra = ["--guest", "--new-window"]
+    if fullscreen:
+        extra.append("--start-fullscreen")
     for path in CHROME_CANDIDATES:
         if path and os.path.exists(path):
             subprocess.Popen([path] + extra + [target])
-            return f"Chrome dibuka -> {target}"
+            return f"Chrome (guest) dibuka -> {target}"
     if os.name == "nt":
         try:
             subprocess.Popen(["cmd", "/c", "start", "chrome"] + extra + [target])
-            return f"Chrome dibuka (start) -> {target}"
+            return f"Chrome (guest) dibuka -> {target}"
         except Exception:
             pass
         try:
@@ -71,10 +74,21 @@ def _console_python() -> str:
 
 
 def _spawn_new_console(args) -> None:
-    kwargs = {}
+    args = list(args)
     if os.name == "nt":
-        kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE  # type: ignore[attr-defined]
-    subprocess.Popen(args, **kwargs)
+        flags = subprocess.CREATE_NEW_CONSOLE  # type: ignore[attr-defined]
+        # Force the classic console host (conhost) so borderless-fullscreen and
+        # window styling work even when Windows Terminal is the default terminal.
+        conhost = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "conhost.exe")
+        if os.path.exists(conhost):
+            try:
+                subprocess.Popen([conhost] + args, creationflags=flags)
+                return
+            except Exception:
+                pass
+        subprocess.Popen(args, creationflags=flags)
+        return
+    subprocess.Popen(args)
 
 
 def open_screensaver() -> str:
@@ -130,8 +144,9 @@ def notify(text: str, title: str = "MADRATIF") -> str:
         try:
             import ctypes
 
-            # MB_ICONINFORMATION | MB_TOPMOST
-            ctypes.windll.user32.MessageBoxW(0, text, title, 0x40 | 0x40000)
+            # MB_ICONWARNING | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_TOPMOST
+            flags = 0x30 | 0x1000 | 0x10000 | 0x40000
+            ctypes.windll.user32.MessageBoxW(0, text, title, flags)
         except Exception:
             pass
 

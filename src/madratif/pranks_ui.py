@@ -12,7 +12,7 @@ import shutil
 import sys
 import time
 
-from .screensaver import enable_vt
+from .screensaver import enable_vt, go_fullscreen
 
 RESET = "\033[0m"
 HIDE = "\033[?25l"
@@ -27,18 +27,6 @@ def _frame_limit():
         return n if n > 0 else None
     except ValueError:
         return None
-
-
-def _maximize():
-    if os.name == "nt":
-        try:
-            import ctypes
-
-            hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-            if hwnd:
-                ctypes.windll.user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE
-        except Exception:
-            pass
 
 
 def _key_pressed() -> bool:
@@ -65,7 +53,7 @@ def _center(text, width):
 
 def _begin():
     enable_vt()
-    _maximize()
+    go_fullscreen()
     time.sleep(0.15)
     sys.stdout.write(HIDE)
 
