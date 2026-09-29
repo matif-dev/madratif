@@ -119,11 +119,22 @@ sendiri** - jadi kamu cukup:
 2. `git push`,
 3. semua PC ikut ter-update otomatis (tanpa install ulang).
 
-Mau langsung tanpa nunggu? Paksa dari master:
+**Master (Termux) juga ikut update sendiri**: tiap kali kamu jalankan sebuah
+perintah, master mengecek versi terbaru (paling sering tiap `update_interval`),
+dan kalau ada yang baru, ia memperbarui dirinya lalu menjalankan ulang
+perintahmu otomatis - jadi command baru langsung bisa dipakai di HP.
+
+Mau langsung tanpa nunggu (dari master): paksa client tarik versi terbaru:
 
 ```bash
 madratif update nama-pc     # satu PC
 madratif update all         # semua PC
+```
+
+Lihat semua command kapan saja:
+
+```bash
+madratif commands
 ```
 
 Catatan: update menarik & menjalankan kode dari repomu sendiri. Jaga akun GitHub

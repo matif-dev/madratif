@@ -15,12 +15,14 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.request
 import zipfile
 
 from . import config as cfgmod
 
 _SHA_FILE = cfgmod.CONFIG_DIR / "update_sha.txt"
+_LAST_CHECK = cfgmod.CONFIG_DIR / "last_check.txt"
 
 
 def _repo(cfg: dict) -> str:
@@ -125,7 +127,7 @@ def check_and_apply(cfg: dict, force: bool = False, pkg_dir: str | None = None):
 
 
 def restart() -> None:
-    """Launch a fresh agent process with the new code, then exit this one.
+    """Launch a fresh AGENT process with the new code, then exit this one.
 
     A detached Popen + os._exit is far more reliable on Windows than os.execv
     (which misbehaves when the agent runs as a hidden pythonw process).
@@ -145,3 +147,45 @@ def restart() -> None:
         except Exception:
             return
     os._exit(0)
+
+
+def restart_inplace() -> None:
+    """Re-run the same CLI command with the new code, keeping the terminal
+    attached (used by the foreground controller / master, e.g. Termux)."""
+    try:
+        sys.stdout.flush()
+    except Exception:
+        pass
+    try:
+        os.execv(sys.executable, [sys.executable, "-m", "madratif"] + sys.argv[1:])
+    except Exception:
+        pass
+
+
+def maybe_autoupdate_cli(cfg: dict) -> None:
+    """Throttled self-update for the master/controller. Checks at most once per
+    `update_interval`; if the repo changed it updates its own files and re-runs
+    the current command with the new code."""
+    if _is_dev_checkout() or not cfg.get("auto_update"):
+        return
+    interval = int(cfg.get("update_interval") or 0)
+    if interval <= 0:
+        return
+    now = time.time()
+    try:
+        last = float(_LAST_CHECK.read_text(encoding="utf-8").strip())
+    except Exception:
+        last = 0.0
+    if now - last < interval:
+        return
+    try:
+        _LAST_CHECK.parent.mkdir(parents=True, exist_ok=True)
+        _LAST_CHECK.write_text(str(now), encoding="utf-8")
+    except Exception:
+        pass
+    try:
+        updated, _msg = check_and_apply(cfg, force=False)
+    except Exception:
+        return
+    if updated:
+        restart_inplace()

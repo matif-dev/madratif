@@ -116,6 +116,47 @@ def cmd_connect(args) -> int:
     return 0
 
 
+def cmd_commands() -> int:
+    lines = [
+        "MADRATIF - daftar command",
+        "",
+        "KONTROL:",
+        "  clients                          daftar PC yang online",
+        "  google <url> <client>            buka Chrome ke url tujuan",
+        "  screensaver <client>             tampilkan screensaver 'MADRATIF'",
+        "  status <client>                  panel status client (host, IP, dst)",
+        "  ping <client>                    cek koneksi + versi client",
+        "",
+        "PRANK (jalan di PC target):",
+        "  say <teks...> <client>           PC ngomong (text-to-speech)",
+        "  notify <pesan...> <client>       munculin pop-up teks",
+        "  rickroll <client>                buka Rick Astley fullscreen",
+        "  beep <client>                    mainin bunyi/nada",
+        "  wallpaper <url|reset> <client>   ganti wallpaper (reset = balik)",
+        "  matrix <client>                  layar hujan kode hijau",
+        "  fakeupdate <client>              layar 'Windows Update' palsu",
+        "  minimize <client>                minimize semua jendela",
+        "  volume <0-100|max> <client>      atur volume",
+        "  spin <client>                    putar layar 180 derajat",
+        "  unspin <client>                  balikin layar normal",
+        "  bsod <client>                    blue screen palsu",
+        "  disco <client>                   layar kedip warna-warni",
+        "  countdown <detik> <client>       hitung mundur 'self-destruct'",
+        "",
+        "UPDATE & KONFIGURASI:",
+        "  update <client>                  paksa client tarik versi terbaru",
+        "  connect <kode>                   sambungkan device pakai kode rahasia",
+        "  setup                            konfigurasi interaktif (lanjutan)",
+        "  config                           tampilkan konfigurasi",
+        "  commands                         tampilkan daftar ini",
+        "  version",
+        "",
+        "Tips: pakai 'all' sebagai <client> untuk kirim ke SEMUA PC sekaligus.",
+    ]
+    print("\n".join(lines))
+    return 0
+
+
 def cmd_config() -> int:
     cfg = cfgmod.load()
     safe = dict(cfg)
@@ -145,6 +186,8 @@ def main(argv=None) -> int:
         return cmd_setup()
     if cmd == "config":
         return cmd_config()
+    if cmd == "commands":
+        return cmd_commands()
 
     # Internal commands used by the agent to open a fresh window locally.
     if cmd == "_screensaver":
@@ -185,6 +228,12 @@ def main(argv=None) -> int:
             return 0
         print("Sub-perintah tidak dikenal. Coba: madratif client start")
         return 2
+
+    # Master/controller auto-update (throttled) before running the command,
+    # so new commands work right away in Termux too.
+    from . import updater
+
+    updater.maybe_autoupdate_cli(cfgmod.load())
 
     # Controller commands.
     from . import controller
